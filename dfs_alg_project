@@ -1,0 +1,133 @@
+#include <iostream>
+#include <unordered_map>
+#include <list>
+#include <fstream>
+
+// result strings
+const std::string SUCCESS_MSG = "Mission Accomplished!";
+const std::string FAILURE_MSG = "Mission Failed, we'll get 'em next time.";
+
+// minimum descent ratio (ratio 2 -> descent 2 feet per 1 feet horizontal)
+const double MIN_DESCENT_RATIO = 2.0;
+
+// struct holds adjacent structure name and horizontal distance between
+struct Connection
+{
+    std::string targetLocation;
+    int distance;
+};
+
+// prototype
+bool executeMission(std::string, std::string &,
+                    std::unordered_map<std::string, std::list<Connection>> &,
+                    std::unordered_map<std::string, int> &,
+                    std::unordered_map<std::string, bool>);
+
+int main()
+{
+    // maps location names to adjacent connections
+    std::unordered_map<std::string, std::list<Connection>> metropolis;
+    // maps locations to their elevations
+    std::unordered_map<std::string, int> locationElevations;
+    // maps visited locations for DFS recurring function
+    std::unordered_map<std::string, bool> visited;
+    // get start of a route
+    std::cout << "Enter starting location: \n";
+    std::string start;
+    std::cin >> start;
+    // get target of a route
+    std::cout << "Enter target location: \n";
+    std::string target;
+    std::cin >> target;
+    // get city schematic fileName
+    std::cout << "Enter metropolis city schematic file: \n";
+    std::string fileName;
+    std::cin >> fileName;
+    // input filestream
+    std::ifstream inFile(fileName);
+    // read and map location name to list of adjacent locations
+    std::string location;
+    Connection tempConnection;
+    inFile >> location;
+    inFile >> tempConnection.targetLocation;
+    inFile >> tempConnection.distance;
+    metropolis[location].push_back(tempConnection);
+    while (inFile)
+    {
+        inFile >> location;
+        inFile >> tempConnection.targetLocation;
+        inFile >> tempConnection.distance;
+        metropolis[location].push_back(tempConnection);
+        std::string reverse = location;
+        location = tempConnection.targetLocation;
+        tempConnection.targetLocation = reverse;
+        metropolis[location].push_back(tempConnection);
+    }
+    inFile.close();
+    // get location elevations
+    std::cout << "Enter metropolis city locations elevation file: \n";
+    std::cin >> fileName;
+    inFile.open(fileName);
+    inFile >> location;
+    inFile >> locationElevations[location];
+    while (inFile)
+    {
+        inFile >> location;
+        inFile >> locationElevations[location];
+    }
+    inFile.close();
+    // output result found by recursive DFS function
+    if (executeMission(start, target, metropolis, locationElevations, visited))
+        std::cout << SUCCESS_MSG;
+    else
+        std::cout << FAILURE_MSG;
+}
+
+// This function attempts to find a path from the current location to the destination
+// using a recursive depth-first search (DFS) approach. It evaluates the path based on
+// the descent ratio between connected locations, ensuring it meets a minimum criteria
+// for successful traversal.
+bool executeMission(std::string currentLocation, std::string &destination,
+                    std::unordered_map<std::string, std::list<Connection>> &metropolis,
+                    std::unordered_map<std::string, int> &locationElevations,
+                    std::unordered_map<std::string, bool> visited)
+{
+    // Mark the current location as visited to avoid revisiting it
+    visited[currentLocation] = true;
+    
+    // Check if the current location is the destination. If so, the mission is successful
+    if (currentLocation == destination)
+        return true;
+
+    // Initialize missionSuccess to false. This will be updated if a valid path is found
+    bool missionSuccess = false;
+
+    // Iterate through all connections from the current location
+    for (auto it = metropolis[currentLocation].begin(); it != metropolis[currentLocation].end(); it++)
+    {
+        // Skip this connection if the target location has already been visited
+        if (visited[(*it).targetLocation])
+            continue;
+
+        // Calculate the elevation difference between the current location and the target location
+        int elevationDifference = locationElevations[currentLocation] - locationElevations[(*it).targetLocation];
+        
+        // Calculate the descent ratio for this connection
+        double descentRatio = static_cast<double>(elevationDifference) / static_cast<double>((*it).distance);
+        
+        // Check if the descent ratio meets the minimum requirement for a successful mission
+        if (descentRatio >= MIN_DESCENT_RATIO)
+        {
+            // Recursively call executeMission for the target location. If a path to the destination
+            // is found from here, mark the mission as successful and break out of the loop
+            if (executeMission((*it).targetLocation, destination, metropolis, locationElevations, visited))
+            {
+                missionSuccess = true;
+                break;
+            }
+        }
+    }
+
+    // Return true if a successful path to the destination was found, otherwise return false
+    return missionSuccess;
+}
